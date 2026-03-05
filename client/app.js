@@ -1,11 +1,23 @@
-// WebRTC Configuration
+// WebRTC Configuration with multiple ICE servers (Google alternatives for blocked regions)
 const RTCConfiguration = {
   iceServers: [
+    // Primary servers (works when available)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    
+    // Alternative servers for regions where Google is blocked
+    { urls: 'stun:stun.stunprotocol.org:3478' },
+    { urls: 'stun:stun.ekiga.net:3478' },
+    { urls: 'stun:stun.ideasip.com:3478' },
+    { urls: 'stun:stun.openvpn.net:3478' },
+    { urls: 'stun:stun.sip2sip.info' },
+    { urls: 'stun:stun.talky.io' },
+    { urls: 'stun:stun.bigspeech.org:3478' },
+    { urls: 'stun:numb.viagenie.ca' },
+    { urls: 'stun:stun.1und1.de:3478' },
+    { urls: 'stun:stun.bluesystem.org:3478' },
+    { urls: 'stun:stun.miwifi.com:3478' },
+    { urls: 'stun:stun.nextcloud.com:443' }
   ]
 };
 
@@ -112,7 +124,13 @@ async function initialize() {
 }
 
 function generatePeerId() {
-  return 'peer-' + Math.random().toString(36).substr(2, 9);
+  // Generate 6-character alphanumeric ID
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let id = '';
+  for (let i = 0; i < 6; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
 }
 
 async function enumerateMediaDevices() {
@@ -136,7 +154,19 @@ async function enumerateMediaDevices() {
       return;
     }
     
-    // Try to enumerate devices (don't request permissions yet)
+    // Request initial permissions to get device labels
+    try {
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { width: { max: 320 }, height: { max: 240 } }, 
+        audio: true 
+      });
+      // Stop tracks immediately after getting device info
+      permissionStream.getTracks().forEach(track => track.stop());
+    } catch (permError) {
+      console.warn('Permission request deferred, device labels may be generic:', permError.message);
+    }
+    
+    // Enumerate devices
     const devices = await navigator.mediaDevices.enumerateDevices();
     console.log('Devices found:', devices);
     
@@ -165,12 +195,14 @@ async function enumerateMediaDevices() {
       console.log('Added audio device:', option.text);
     });
 
-    // Auto-select first devices
+    // Auto-select first devices if available
     if (videoDevices.length > 0) {
       videoDeviceSelect.value = videoDevices[0].deviceId;
+      console.log('Auto-selected video device:', videoDevices[0].deviceId);
     }
     if (audioDevices.length > 0) {
       audioDeviceSelect.value = audioDevices[0].deviceId;
+      console.log('Auto-selected audio device:', audioDevices[0].deviceId);
     }
 
     if (videoDevices.length === 0 || audioDevices.length === 0) {
@@ -398,14 +430,17 @@ function handleMessage(message) {
 }
 
 function updatePeersList(peers) {
-  if (peers.length === 0) {
+  // Filter out own peer ID from the list
+  const filteredPeers = peers.filter(peer => peer !== peerId);
+  
+  if (filteredPeers.length === 0) {
     peersList.innerHTML = '';
     noPeersDiv.style.display = 'block';
   } else {
     noPeersDiv.style.display = 'none';
-    peersList.innerHTML = peers.map(peer => `
+    peersList.innerHTML = filteredPeers.map(peer => `
       <li class="peer-item">
-        <span class="peer-name">${peer.substring(0, 20)}...</span>
+        <span class="peer-name">${peer}</span>
         <button onclick="selectPeerAndCall('${peer}')">Позвонить</button>
       </li>
     `).join('');
