@@ -150,12 +150,41 @@ main {
   margin-bottom: 20px;
 }
 
+/* Dynamic video layout - main + pip style */
+.video-container.with-remote {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+}
+
+.video-container.with-remote .remote-video {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.video-container.with-remote .local-video {
+  grid-column: 1;
+  grid-row: 1;
+  width: 150px;
+  height: 200px;
+  margin: auto auto auto auto;
+  margin-left: auto;
+  margin-top: 10px;
+  margin-right: 10px;
+  justify-self: end;
+  align-self: start;
+  z-index: 10;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
 .video-box {
   position: relative;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
   aspect-ratio: 4/3;
+  transition: all 0.3s ease;
 }
 
 .video-box video {
@@ -173,14 +202,54 @@ main {
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 12px;
+  z-index: 5;
 }
 
+/* Visibility handling */
 .remote-video video {
   display: none;
 }
 
 .remote-video.active video {
   display: block;
+}
+
+.local-video video {
+  display: block;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .video-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .video-container.with-remote .local-video {
+    width: 120px;
+    height: 160px;
+    margin-top: 5px;
+    margin-right: 5px;
+    border-width: 2px;
+  }
+  
+  .video-box {
+    aspect-ratio: 3/4;
+  }
+}
+
+@media (max-width: 480px) {
+  .video-container.with-remote .local-video {
+    width: 100px;
+    height: 133px;
+    margin-top: 3px;
+    margin-right: 3px;
+  }
+  
+  .video-box label {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
 }
 
 .controls {

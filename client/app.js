@@ -1,11 +1,9 @@
-// WebRTC Configuration with multiple ICE servers (Google alternatives for blocked regions)
+// WebRTC Configuration with multiple ICE servers and TURN servers for NAT traversal
 const RTCConfiguration = {
   iceServers: [
-    // Primary servers (works when available)
+    // STUN servers - for NAT detection (free servers)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    
-    // Alternative servers for regions where Google is blocked
     { urls: 'stun:stun.stunprotocol.org:3478' },
     { urls: 'stun:stun.ekiga.net:3478' },
     { urls: 'stun:stun.ideasip.com:3478' },
@@ -17,7 +15,36 @@ const RTCConfiguration = {
     { urls: 'stun:stun.1und1.de:3478' },
     { urls: 'stun:stun.bluesystem.org:3478' },
     { urls: 'stun:stun.miwifi.com:3478' },
-    { urls: 'stun:stun.nextcloud.com:443' }
+    { urls: 'stun:stun.nextcloud.com:443' },
+    
+    // TURN servers - for relay through firewall (internet connectivity)
+    // These allow communication when direct NAT traversal fails
+    {
+      urls: ['turn:relay.metered.ca:80'],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: ['turn:relay.metered.ca:443'],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: ['turn:relay.metered.ca:80?transport=tcp'],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: ['turn:relay.metered.ca:443?transport=tcp'],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    // Backup TURN server
+    {
+      urls: ['turn:numb.viagenie.ca'],
+      username: 'mozilla@mozilla.org',
+      credential: 'webrtcdemo'
+    }
   ]
 };
 
@@ -32,6 +59,9 @@ let remotePeerId = null;
 let incomingCall = null;
 let isAudioEnabled = true;
 let isVideoEnabled = true;
+let wsReconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+let isNetworkOnline = navigator.onLine;
 
 // DOM elements (will be initialized after DOM is ready)
 let localVideo = null;
@@ -114,6 +144,9 @@ async function initialize() {
     // Setup event listeners
     console.log('Setting up event listeners...');
     setupEventListeners();
+    
+    // Setup network listeners
+    setupNetworkListeners();
 
     console.log('Initialization complete');
     updateStatus('Готово', true);
@@ -343,36 +376,79 @@ function showMediaSuccess(message) {
 }
 
 function connectWebSocket() {
+  if (!isNetworkOnline) {
+    console.log('Network is offline, cannot connect');
+    updateStatus('❌ Нет интернета', false);
+    setTimeout(connectWebSocket, 5000);
+    return;
+  }
+  
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}`;
 
-  ws = new WebSocket(wsUrl);
+  try {
+    ws = new WebSocket(wsUrl);
 
-  ws.onopen = () => {
-    console.log('WebSocket connected');
-    // Register peer
-    sendMessage({
-      type: 'register',
-      peerId: peerId
-    });
-    updateStatus('Подключено', true);
-  };
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      wsReconnectAttempts = 0;
+      // Register peer
+      sendMessage({
+        type: 'register',
+        peerId: peerId
+      });
+      updateStatus('✓ Подключено', true);
+    };
 
-  ws.onmessage = (event) => {
-    handleMessage(JSON.parse(event.data));
-  };
+    ws.onmessage = (event) => {
+      handleMessage(JSON.parse(event.data));
+    };
 
-  ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
-    updateStatus('Ошибка подключения', false);
-  };
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      updateStatus('⚠️ Ошибка подключения', false);
+    };
 
-  ws.onclose = () => {
-    console.log('WebSocket closed');
-    updateStatus('Отключено', false);
-    // Try to reconnect after 3 seconds
-    setTimeout(connectWebSocket, 3000);
-  };
+    ws.onclose = () => {
+      console.log('WebSocket closed, reconnecting...');
+      updateStatus('↻ Переподключение...', false);
+      
+      wsReconnectAttempts++;
+      if (wsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        const delay = Math.min(1000 * Math.pow(1.5, wsReconnectAttempts), 30000);
+        console.log(`Reconnecting in ${delay}ms (attempt ${wsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+        setTimeout(connectWebSocket, delay);
+      } else {
+        console.error('Max reconnection attempts reached');
+        updateStatus('❌ Не удалось подключиться', false);
+      }
+    };
+  } catch (error) {
+    console.error('WebSocket connection error:', error);
+    updateStatus('❌ Ошибка подключения', false);
+    setTimeout(connectWebSocket, 5000);
+  }
+}
+
+function setupNetworkListeners() {
+  window.addEventListener('online', () => {
+    console.log('Network is online');
+    isNetworkOnline = true;
+    updateStatus('↻ Восстановление соединения...', false);
+    wsReconnectAttempts = 0;
+    if (!ws || ws.readyState === WebSocket.CLOSED) {
+      connectWebSocket();
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    console.log('Network is offline');
+    isNetworkOnline = false;
+    updateStatus('❌ Нет интернета', false);
+    if (ws) {
+      ws.close();
+    }
+  });
 }
 
 function setupEventListeners() {
@@ -391,6 +467,10 @@ function setupEventListeners() {
   hangupBtn.addEventListener('click', endCall);
   acceptCallBtn.addEventListener('click', acceptIncomingCall);
   rejectCallBtn.addEventListener('click', rejectIncomingCall);
+  
+  // Dynamic video layout - swap on click
+  localVideo.addEventListener('click', () => swapVideoLayout());
+  remoteVideo.addEventListener('click', () => swapVideoLayout());
 }
 
 function copyPeerId() {
@@ -480,6 +560,7 @@ async function initiateCall() {
       console.log('Received remote track:', event.track.kind);
       remoteVideo.srcObject = event.streams[0];
       remoteVideo.parentElement.classList.add('active');
+      document.querySelector('.video-container').classList.add('with-remote');
     };
 
     // Handle ICE candidates
@@ -546,6 +627,7 @@ async function acceptIncomingCall() {
       console.log('Received remote track:', event.track.kind);
       remoteVideo.srcObject = event.streams[0];
       remoteVideo.parentElement.classList.add('active');
+      document.querySelector('.video-container').classList.add('with-remote');
     };
 
     // Handle ICE candidates
@@ -675,6 +757,7 @@ function endCall() {
   remotePeerId = null;
   remoteVideo.srcObject = null;
   remoteVideo.parentElement.classList.remove('active');
+  document.querySelector('.video-container').classList.remove('with-remote');
 
   hangupBtn.disabled = true;
   callPeerBtn.disabled = false;
@@ -686,6 +769,19 @@ function endCall() {
 function updateStatus(message, connected) {
   statusEl.textContent = message;
   statusEl.className = connected ? 'connected' : 'disconnected';
+}
+
+function swapVideoLayout() {
+  const videoContainer = document.querySelector('.video-container');
+  const local = document.querySelector('.local-video');
+  const remote = document.querySelector('.remote-video');
+  
+  if (videoContainer.classList.contains('with-remote') && local && remote) {
+    // Swap the order by inserting remote before local
+    if (local.parentNode === videoContainer && remote.parentNode === videoContainer) {
+      videoContainer.insertBefore(remote, local);
+    }
+  }
 }
 
 // Start initialization when DOM is ready
