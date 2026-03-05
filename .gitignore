@@ -1,0 +1,37 @@
+## Dependencies
+node_modules/
+package-lock.json
+
+## Environment
+.env
+.env.local
+.env.*.local
+
+## HTTPS Certificates (do not commit private keys!)
+server/certs/
+!server/certs/.gitkeep
+
+## OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+## IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+## Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+## Build/Dist
+dist/
+build/
+out/

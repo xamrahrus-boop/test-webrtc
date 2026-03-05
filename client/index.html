@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P WebRTC Video Call</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>P2P WebRTC Video Call</h1>
+      <div class="connection-status">
+        <span id="status">Connecting...</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="media-setup-section">
+        <h3>📹 Настройка камеры и микрофона</h3>
+        <div class="device-selector">
+          <div class="device-group">
+            <label for="videoDevice">Камера:</label>
+            <select id="videoDevice">
+              <option value="">Выбрать камеру...</option>
+            </select>
+          </div>
+          <div class="device-group">
+            <label for="audioDevice">Микрофон:</label>
+            <select id="audioDevice">
+              <option value="">Выбрать микрофон...</option>
+            </select>
+          </div>
+          <button id="enableMedia" class="btn btn-enable">
+            ✓ Включить камеру и микрофон
+          </button>
+          <span id="mediaStatus" class="media-status"></span>
+        </div>
+      </div>
+
+      <div class="video-container">
+        <div class="video-box local-video">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <label>Локальное видео</label>
+        </div>
+        <div class="video-box remote-video">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <label>Видео собеседника</label>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="toggleAudio" class="btn btn-control" title="Переключить звук" disabled>
+          🎤 Микрофон ВКЛ
+        </button>
+        <button id="toggleVideo" class="btn btn-control" title="Переключить видео" disabled>
+          📹 Камера ВКЛ
+        </button>
+        <button id="toggleScreen" class="btn btn-control" title="Поделиться экраном" disabled>
+          🖥️ Поделиться
+        </button>
+        <button id="hangup" class="btn btn-danger" disabled>
+          ☎️ Завершить звонок
+        </button>
+      </div>
+
+      <div class="peers-section">
+        <h3>Доступные пользователи</h3>
+        <ul id="peersList" class="peers-list"></ul>
+        <div id="noPeers" class="no-peers">Нет доступных пользователей</div>
+      </div>
+
+      <div class="info-section">
+        <h3>Ваш ID (Peer ID)</h3>
+        <div class="peer-id">
+          <input type="text" id="peerId" readonly>
+          <button id="copyPeerId" class="btn btn-small">Копировать</button>
+        </div>
+        
+        <div class="peer-connect">
+          <h3>Позвонить пользователю</h3>
+          <input type="text" id="remotePeerId" placeholder="Введите ID пользователя">
+          <button id="callPeer" class="btn">Позвонить</button>
+        </div>
+      </div>
+
+      <div id="callModal" class="modal hidden">
+        <div class="modal-content">
+          <h2>Входящий звонок</h2>
+          <p id="incomingCallerId">От: ...</p>
+          <div class="modal-buttons">
+            <button id="acceptCall" class="btn">Принять</button>
+            <button id="rejectCall" class="btn btn-danger">Отклонить</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>P2P WebRTC Приложение для видеозвонков</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
